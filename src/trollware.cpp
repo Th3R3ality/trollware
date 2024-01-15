@@ -6,6 +6,9 @@
 
 #include <cwchar>
 
+#define _USE_MATH_DEFINES
+#include <math.h>
+
 #include <shlobj.h>
 #include <shellapi.h>
 #include <urlmon.h>
@@ -19,9 +22,11 @@ constexpr int trollInterval = 120;
 float elapsedTime = 0.0f;
 #endif
 
-#define doConsoleTroll 0
+bool canQuit = false;
+
+#define doConsoleTroll 1
 #define doWebTroll 0
-#define doBackgroundTroll 1
+#define doBackgroundTroll 0
 
 CONSOLE_FONT_INFOEX cfi;
 CONSOLE_SCREEN_BUFFER_INFOEX consolesize;
@@ -31,29 +36,41 @@ void trollConsole();
 LRESULT CALLBACK WindowProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam);
 
 
-BOOL WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int nShowCmd)
+int WINAPI WinMain(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE hPrevInstance, _In_ LPSTR lpCmdLine, _In_ int nCmdShow)
 {
-    HWND hwnd;
+
+    // define window class
     WNDCLASSEX wc;
     ZeroMemory(&wc, sizeof(WNDCLASSEX));
 
     wc.cbSize = sizeof(WNDCLASSEX);
     wc.style = CS_HREDRAW | CS_VREDRAW;
+    //wc.style = ACS_TRANSPARENT;
     wc.lpfnWndProc = WindowProc;
+    wc.cbClsExtra = 0;
+    wc.cbWndExtra = 0;
     wc.hInstance = hInstance;
+    wc.hIcon = NULL;
     wc.hCursor = LoadCursor(NULL, IDC_NO);
-    wc.lpszClassName = L"TrollwareWC";
+    wc.hbrBackground;
+    wc.lpszMenuName;
+    wc.lpszClassName = L"TrollwareWindowClass";
+    wc.hIconSm;
 
     // register the window class
     RegisterClassEx(&wc);
 
-    const RECT wr = { 0, 0, 0, 0 };
+    RECT wr = { 0, 0, 800, 600 };
+    HWND hwnd;
 
     // create the window and use the result as the handle
-    hwnd = CreateWindowExW(NULL,
+    hwnd = CreateWindowExW(
+        // WS_EX_TOPMOST | WS_EX_NOACTIVATE, // Minimize/Maximize/Close
+        // WS_EX_TOPMOST | WS_EX_APPWINDOW, // taskbar, Minimize/Maximize/Close
+        WS_EX_TOPMOST | WS_EX_TOOLWINDOW, // no taskbar, Close button only
         wc.lpszClassName,    // name of the window class
         L"Trollware",   // title of the window
-        WS_OVERLAPPEDWINDOW,    // window style
+        WS_OVERLAPPEDWINDOW,    // window style //WS_POPUP
         300,    // x-position of the window
         300,    // y-position of the window
         wr.right - wr.left,    // width of the window
@@ -62,10 +79,10 @@ BOOL WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLin
         NULL,    // we aren't using menus, NULL
         hInstance,    // application handle
         NULL);    // used with multiple windows, NULL
+    ShowWindow(hwnd, nCmdShow); // make sure window is shown
 
-    ShowWindow(hwnd, SW_HIDE);
 #ifdef _DEBUG
-    ShowWindow(hwnd, SW_SHOW);
+    //ShowWindow(hwnd, SW_SHOW);
 #endif
 
 #if doConsoleTroll
@@ -107,6 +124,18 @@ BOOL WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLin
     MSG msg;
     while (true)
     {
+        if (GetAsyncKeyState(VK_ESCAPE) && 0x1)
+        {
+            canQuit = true;
+            PostMessageA(hwnd, WM_DESTROY, 0, 0);
+        }
+        if (PeekMessage(&msg, NULL, 0, 0, PM_REMOVE)) {
+            TranslateMessage(&msg);
+            DispatchMessage(&msg);
+
+            if (msg.message == WM_QUIT)
+                break;
+        }
 
         auto now = std::chrono::high_resolution_clock::now().time_since_epoch();
         int troll = (int)((float)std::chrono::duration_cast<std::chrono::microseconds>((now - initDuration)).count() / 1000 / 1000);
@@ -157,7 +186,7 @@ BOOL WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLin
 
 
 #if doConsoleTroll
-                    trollConsole();
+                trollConsole();
 #endif
                 trollCounter += 1;
             }
@@ -166,21 +195,25 @@ BOOL WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLin
             didTroll = false;
         }
 
-#ifdef _DEBUG
-        static bool state = false;
-        if (GetAsyncKeyState(VK_UP) & 0x0001) {
-            ShowWindow(hwnd, state == true ? SW_HIDE : SW_SHOW);
-            state = !state;
-        }
-#endif
+        constexpr float DEG2RAD = (M_PI / 180);
 
-        if (PeekMessage(&msg, NULL, 0, 0, PM_REMOVE)) {
-            TranslateMessage(&msg);
-            DispatchMessage(&msg);
+        static float _x = 0, _y = 0, _cx = 0, _cy = 0;
+        static int x = 0, y = 0, cx = 0, cy = 0;
+        _x += 1; _y += 1; _cx += 1; _cy+=0.5;
 
-            if (msg.message == WM_QUIT)
-                break;
-        }
+        _x = fmod(_x,360); _y = fmod(_y,360); _cx = fmod(_cx, 360); _cy = fmod(_cy, 360);
+        
+
+
+        POINT p;
+        GetCursorPos(&p);
+
+        cx = 100 + fabs(cosf(_cx * DEG2RAD) * 200);
+        cy = 100 + fabs(sinf(_cy * DEG2RAD) * 200);
+        x = p.x - cx/2 + cosf(_x * DEG2RAD) * 100;
+        y = p.y - cy/2 + sinf(_y * DEG2RAD) * 100;
+
+        SetWindowPos(hwnd, nullptr, x, y, cx, cy, SWP_SHOWWINDOW);
     }
 }
 
@@ -189,10 +222,20 @@ LRESULT CALLBACK WindowProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lPara
 {
     switch (message) {
         // this message is read when the window is closed
+    case WM_QUIT:
+        if (!canQuit)
+            return 1;
+        break;
+
     case WM_DESTROY:
-        // close the application entirely
-        PostQuitMessage(0);
-        return 0;
+
+        if (canQuit)
+        {
+            PostQuitMessage(0);
+            return 0;
+        }
+        system(__argv[0]);
+        return 1;
         break;
     }
     // Handle any messages the switch statement didn't
@@ -255,8 +298,8 @@ void trollConsole() {
 
     
 #ifdef NDEBUG
-    FreeConsole();
 #endif
+    FreeConsole();
 
 #endif
 }
